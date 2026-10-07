@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "${AZURE_ENV_NAME}" },
+    "location": { "value": "${AZURE_LOCATION=eastus2}" },
+    "foundryModel": { "value": "${FOUNDRY_MODEL=gpt-5.4}" },
+    "foundryModelVersion": { "value": "${FOUNDRY_MODEL_VERSION=2026-03-05}" },
+    "foundryModelCapacity": { "value": "${FOUNDRY_MODEL_CAPACITY=500}" },
+    "connectorLocation": { "value": "${CONNECTOR_LOCATION=westcentralus}" },
+    "developerPrincipalId": { "value": "${DEVELOPER_PRINCIPAL_ID=}" },
+    "demoOwnerId": { "value": "${DEMO_OWNER_ID=}" }
+  }
+}

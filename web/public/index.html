@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Bus ingestion</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/flow.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="icon" aria-hidden="true">AF</span> Azure Functions <span class="divider">/</span> Hosted skills</div>
+    <div class="account"><span id="account">Checking access...</span><a id="sign-in" href="/.auth/login/aad?post_login_redirect_uri=/" hidden>Microsoft sign-in</a><a id="sign-out" href="/.auth/logout?post_logout_redirect_uri=/" hidden>Sign out</a></div>
+  </header>
+  <main>
+    <div class="intro"><h1>Service Bus ingestion</h1><p>An existing Azure Function processes Service Bus messages and saves the results to Blob Storage. Malformed messages go to the dead-letter queue, where a hosted skill repairs them and sends them back for processing.</p></div>
+    <div id="access-note" class="notice">Checking Microsoft sign-in. Only the configured demo owner can send messages.</div>
+    <div id="error" class="error" role="alert" hidden></div>
+    <div class="demo-layout">
+    <div class="controls">
+      <section class="card composer">
+        <div class="section-heading"><h2>1. Send a message</h2><span class="tag">JSON input</span></div>
+        <div class="examples"><button id="valid" class="secondary" disabled>Load valid example</button><button id="malformed" class="secondary" disabled>Load malformed example</button></div>
+        <label for="message">Message JSON</label>
+        <textarea id="message" spellcheck="false" rows="7" disabled></textarea>
+        <button id="send" disabled>Send message</button>
+      </section>
+      <section class="card batch">
+        <h2>2. Send a batch</h2>
+        <div class="batch-number">1,000 <span>records</span></div>
+        <button id="batch" disabled>Send 1,000 records</button>
+      </section>
+    </div>
+    <div class="live-view">
+    <section class="card flow-card" aria-labelledby="flow-title">
+      <div class="flow-heading">
+        <div><h2 id="flow-title">Message flow</h2><p id="flow-freshness" class="flow-note">Last confirmed stages. Waiting for a run.</p></div>
+        <span id="flow-state" class="flow-state" role="status">Ready</span>
+      </div>
+      <div class="flow-stage">
+      <canvas id="flow-dots" class="flow-dots" aria-hidden="true"></canvas>
+      <svg id="flow-svg" class="flow-diagram" viewBox="0 0 960 425" role="img" aria-labelledby="flow-title flow-description">
+        <desc id="flow-description">Confirmed ingestion, rejection, requeued receipt, and saved output. After validation failure, estimated dot movement fills the unobserved dead-letter queue and hosted skill interval. Return movement requires a confirmed requeued receipt. Dot positions and timing are not measured. Counts are not broker queue depths.</desc>
+        <defs>
+          <marker id="flow-arrow-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#7a9cdd" stroke-width="1.6"/></marker>
+          <marker id="flow-arrow-malformed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#c28a39" stroke-width="1.6"/></marker>
+          <marker id="flow-arrow-recovered" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#9169cc" stroke-width="1.6"/></marker>
+        </defs>
+        <g class="flow-routes" fill="none">
+          <path id="flow-input-route" class="flow-route route-main" d="M256 114 H364" marker-end="url(#flow-arrow-main)"/>
+          <path id="flow-output-route" class="flow-route route-main" d="M596 114 H704" marker-end="url(#flow-arrow-main)"/>
+          <path id="flow-malformed-route" class="flow-route route-malformed" d="M480 164 V298 H704" marker-end="url(#flow-arrow-malformed)"/>
+          <path class="flow-route route-recovered" d="M814 346 V370 Q814 386 798 386 H162 Q146 386 146 370 V164" marker-end="url(#flow-arrow-recovered)"/>
+          <path id="flow-received-repair-route" d="M814 346 V370 Q814 386 798 386 H162 Q146 386 146 370 V114 H364" stroke="none"/>
+        </g>
+        <g class="flow-route-labels">
+          <text x="310" y="93" text-anchor="middle">Messages</text>
+          <text x="650" y="93" text-anchor="middle">Valid output</text>
+          <text x="493" y="210">Validation failure</text>
+          <text id="flow-recovery-status" x="650" y="232" text-anchor="middle">Recovery path</text>
+          <text x="480" y="412" text-anchor="middle">Requeue to the same input</text>
+        </g>
+        <g id="flow-node-queue" class="flow-node node-main" transform="translate(36 64)">
+          <rect class="node-box" width="220" height="100" rx="14"/>
+          <rect class="node-icon" x="16" y="17" width="30" height="30" rx="8"/>
+          <text class="node-symbol" x="31" y="38" text-anchor="middle">Q</text>
+          <text class="node-title" x="57" y="37">Service Bus</text>
+          <text class="node-detail" x="18" y="61">data-ingestion</text>
+          <text id="flow-sent" class="node-count" x="18" y="84">0 sent</text>
+        </g>
+        <g id="flow-node-ingest" class="flow-node node-main" transform="translate(364 64)">
+          <rect class="node-box" width="232" height="100" rx="14"/>
+          <rect class="node-icon" x="16" y="17" width="30" height="30" rx="8"/>
+          <text class="node-symbol" x="31" y="37" text-anchor="middle">AF</text>
+          <text class="node-title" x="57" y="37">Ingestion function</text>
+          <text class="node-detail" x="18" y="61">Validate and normalize</text>
+          <text id="flow-valid" class="node-count" x="18" y="84">0 received; awaiting output</text>
+        </g>
+        <g id="flow-node-output" class="flow-node node-output" transform="translate(704 64)">
+          <rect class="node-box" width="220" height="100" rx="14"/>
+          <rect class="node-icon" x="16" y="17" width="30" height="30" rx="8"/>
+          <text class="node-symbol" x="31" y="38" text-anchor="middle">B</text>
+          <text class="node-title" x="57" y="37">Blob Storage</text>
+          <text class="node-detail" x="18" y="61">processed-data</text>
+          <text id="flow-stored" class="node-count" x="18" y="84">0 output files</text>
+        </g>
+        <g id="flow-node-dlq" class="flow-node node-dlq" transform="translate(364 250)">
+          <rect class="node-box" width="232" height="96" rx="14"/>
+          <rect class="node-icon" x="16" y="15" width="30" height="30" rx="8"/>
+          <text class="node-symbol" x="31" y="36" text-anchor="middle">!</text>
+          <text class="node-title" x="57" y="35">Dead-letter queue</text>
+          <text class="node-detail" x="18" y="59">Estimated recovery movement</text>
+          <text id="flow-malformed" class="node-count" x="18" y="82">0 rejected records</text>
+        </g>
+        <g id="flow-node-skill" class="flow-node node-skill" transform="translate(704 250)">
+          <rect class="node-box" width="220" height="96" rx="14"/>
+          <rect class="node-icon" x="16" y="15" width="30" height="30" rx="8"/>
+          <text class="node-symbol" x="31" y="35" text-anchor="middle">AI</text>
+          <text class="node-title" x="57" y="35">Hosted skill</text>
+          <text class="node-detail" x="18" y="59">Estimated recovery movement</text>
+          <text id="flow-repaired" class="node-count" x="18" y="82">0 recovered outputs</text>
+        </g>
+      </svg>
+      </div>
+      <div class="flow-footer">
+        <div class="flow-legend"><span><i class="dot-valid"></i>Receipt / output</span><span><i class="dot-malformed"></i>Estimated recovery path</span><span><i class="dot-recovered"></i>Requeued receipt</span></div>
+        <button id="flow-focus" class="secondary" aria-pressed="false">Highlight repair path</button>
+      </div>
+    </section>
+    <section id="results" aria-label="Run progress" hidden>
+      <div class="run-heading"><h2 id="run-title">Current run</h2><div class="run-actions"><span id="elapsed">0s elapsed</span><button id="clear" class="secondary" disabled title="Available after the run finishes. This only clears the display.">Clear results</button></div></div>
+      <div class="metrics">
+        <div class="card metric"><h3>Records processed</h3><div><strong id="processed">0</strong><span id="total"> / 1</span></div><progress id="processed-bar" value="0" max="1" aria-label="Records processed"></progress><p>Confirmed output files</p></div>
+        <div class="card metric recovery"><h3>Malformed records recovered</h3><div><strong id="recovered">0</strong><span id="bad-total"> / 0</span></div><progress id="recovered-bar" value="0" max="1" aria-label="Malformed records recovered"></progress><p id="recovery-note">Confirmed by their record IDs</p></div>
+      </div>
+      <div class="status-row"><p id="status" role="status" aria-live="polite">Submitting...</p><button id="resume" class="secondary" hidden>Try checking again</button><button id="retry" class="secondary" hidden>Retry same submission</button></div>
+      <section class="card comparison">
+        <div class="example-heading"><h2 id="example-title">Follow this record</h2><code id="record-id"></code></div>
+        <div class="panes"><div><h3>Submitted input</h3><pre id="original"></pre></div><div><h3>Processed output</h3><pre id="output">No output yet.</pre></div></div>
+      </section>
+      <p class="help" id="run-id"></p>
+    </section>
+    </div>
+    </div>
+  </main>
+</body>
+</html>

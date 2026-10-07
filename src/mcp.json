@@ -1,0 +1,22 @@
+{
+  "servers": {
+    "ingestion-schema": {
+      "type": "http",
+      "url": "$SCHEMA_MCP_SERVER_URL",
+      "tools": ["azureblob_GetFileContentByPath_V2"],
+      "auth": {
+        "scope": "https://apihub.azure.com/.default",
+        "client_id": "$INGESTION_MCP_CLIENT_ID"
+      }
+    },
+    "ingestion-requeue": {
+      "type": "http",
+      "url": "$QUEUE_MCP_SERVER_URL",
+      "tools": ["servicebus_SendMessage"],
+      "auth": {
+        "scope": "https://apihub.azure.com/.default",
+        "client_id": "$INGESTION_MCP_CLIENT_ID"
+      }
+    }
+  }
+}

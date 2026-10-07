@@ -1,0 +1,32 @@
+name: hosted-skills-dlq-repair
+services:
+  api:
+    project: ./src
+    language: python
+    host: function
+  web:
+    project: ./web
+    language: js
+    host: staticwebapp
+    dist: public
+hooks:
+  preprovision:
+    posix:
+      shell: sh
+      continueOnError: false
+      run: azd env set AZURE_LOCATION "${AZURE_LOCATION:-eastus2}"
+    windows:
+      shell: pwsh
+      continueOnError: false
+      run: |
+        $location = if ($env:AZURE_LOCATION) { $env:AZURE_LOCATION } else { "eastus2" }
+        azd env set AZURE_LOCATION $location
+  postprovision:
+    posix:
+      shell: sh
+      continueOnError: false
+      run: python scripts/seed_schema.py
+    windows:
+      shell: pwsh
+      continueOnError: false
+      run: python scripts/seed_schema.py
