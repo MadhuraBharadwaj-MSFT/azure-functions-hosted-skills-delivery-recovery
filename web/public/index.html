@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Service Bus ingestion</title>
+  <title>Data ingestion</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/flow.js" defer></script>
   <script src="/app.js" defer></script>
@@ -14,7 +14,7 @@
     <div class="account"><span id="account">Checking access...</span><a id="sign-in" href="/.auth/login/aad?post_login_redirect_uri=/" hidden>Microsoft sign-in</a><a id="sign-out" href="/.auth/logout?post_logout_redirect_uri=/" hidden>Sign out</a></div>
   </header>
   <main>
-    <div class="intro"><h1>Service Bus ingestion</h1><p>An existing Azure Function processes Service Bus messages and saves the results to Blob Storage. Malformed messages go to the dead-letter queue, where a hosted skill repairs them and sends them back for processing.</p></div>
+    <div class="intro"><h1>Data ingestion</h1><p>An existing Azure Function processes Service Bus messages and saves the results to Blob Storage. Malformed messages go to the dead-letter queue, where a hosted skill repairs them and sends them back for processing.</p></div>
     <div id="access-note" class="notice">Checking Microsoft sign-in. Only the configured demo owner can send messages.</div>
     <div id="error" class="error" role="alert" hidden></div>
     <div class="demo-layout">
@@ -41,7 +41,7 @@
       <div class="flow-stage">
       <canvas id="flow-dots" class="flow-dots" aria-hidden="true"></canvas>
       <svg id="flow-svg" class="flow-diagram" viewBox="0 0 960 425" role="img" aria-labelledby="flow-title flow-description">
-        <desc id="flow-description">Confirmed ingestion, rejection, requeued receipt, and saved output. After validation failure, estimated dot movement fills the unobserved dead-letter queue and hosted skill interval. Return movement requires a confirmed requeued receipt. Dot positions and timing are not measured. Counts are not broker queue depths.</desc>
+        <desc id="flow-description">Service Bus owns the input queue and its dead-letter subqueue. One Function App hosts ingestion and the repair skill. When ingestion fails, the runtime abandons the message; Service Bus dead-letters it when the delivery limit is reached. Confirmed ingestion, rejection, requeued receipt, and saved output drive the counts. After validation failure, estimated dot movement fills the unobserved dead-letter queue and hosted skill interval. Return movement requires a confirmed requeued receipt. Dot positions and timing are not measured. Counts are not broker queue depths.</desc>
         <defs>
           <marker id="flow-arrow-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#7a9cdd" stroke-width="1.6"/></marker>
           <marker id="flow-arrow-malformed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 1 1 L 9 5 L 1 9" fill="none" stroke="#c28a39" stroke-width="1.6"/></marker>
@@ -57,7 +57,8 @@
         <g class="flow-route-labels">
           <text x="310" y="93" text-anchor="middle">Messages</text>
           <text x="650" y="93" text-anchor="middle">Valid output</text>
-          <text x="493" y="210">Validation failure</text>
+          <text x="493" y="193">Failed processing</text>
+          <text x="493" y="212">to Service Bus DLQ</text>
           <text id="flow-recovery-status" x="650" y="232" text-anchor="middle">Recovery path</text>
           <text x="480" y="412" text-anchor="middle">Requeue to the same input</text>
         </g>
@@ -103,6 +104,7 @@
         </g>
       </svg>
       </div>
+      <p class="flow-note flow-ownership">The DLQ belongs to Service Bus. Ingestion and repair run in one Function App.</p>
       <div class="flow-footer">
         <div class="flow-legend"><span><i class="dot-valid"></i>Receipt / output</span><span><i class="dot-malformed"></i>Estimated recovery path</span><span><i class="dot-recovered"></i>Requeued receipt</span></div>
         <button id="flow-focus" class="secondary" aria-pressed="false">Highlight repair path</button>

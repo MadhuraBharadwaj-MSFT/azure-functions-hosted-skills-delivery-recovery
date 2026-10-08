@@ -1,12 +1,6 @@
 ---
 name: DLQ Repair
 description: Repair malformed ingestion records and return them to the primary Service Bus queue.
-timeout: 240
-agent_configuration:
-  max_output_tokens: 2048
-system_tools:
-  web_request: false
-tools: true
 trigger:
   type: service_bus_queue_trigger
   args:

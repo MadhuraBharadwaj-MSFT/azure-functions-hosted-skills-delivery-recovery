@@ -11,10 +11,19 @@ The ingestion code does not call a model.
 
 ```mermaid
 flowchart LR
-    Q[Service Bus: data-ingestion] --> I[Existing ingestion function]
+    subgraph SB[Service Bus]
+        Q[data-ingestion queue]
+        D[Dead-letter subqueue]
+    end
+    subgraph AF[One Function App]
+        I[Existing ingestion function]
+        S[dlq_repair.agent.md]
+    end
+    Q --> I
     I -->|Valid records| B[Blob Storage: processed-data]
-    I -->|Failed ingestion attempt| D[Service Bus DLQ]
-    D --> S[dlq_repair.agent.md]
+    I -->|Failure: runtime abandons message| Q
+    Q -->|Service Bus: delivery limit reached| D
+    D -->|DLQ trigger| S
     S -->|Read schema through connector MCP| C[Blob Storage: schemas]
     S -->|Repair and requeue through connector MCP| Q
 ```
@@ -140,9 +149,10 @@ not a token-spend limit; browser batches contain five malformed records, and
 the CLI producer also defaults to five. Retries can add repair attempts and model calls.
 For the configured model, capacity 500 provides 500 requests and 500,000 tokens
 per minute. Each repair needs multiple model calls, so capacity 50 was insufficient
-for the 25-malformed test and produced repeated 429 errors. The native agent caps
-output at 2,048 tokens per model call to avoid reserving an unnecessarily large
-response budget. GlobalStandard capacity allocates throughput, not prepaid tokens
+for the 25-malformed test and produced repeated 429 errors. The skill does not
+override the runtime's model output limit; the previous configuration used a
+2,048-token cap to avoid reserving an unnecessarily large response budget.
+GlobalStandard capacity allocates throughput, not prepaid tokens
 or a fixed token bill; actual token usage is billed. The malformed input cap
 does not guarantee a batch completion time.
 Model availability, subscription quota, and preview connector availability still
@@ -207,8 +217,13 @@ For a 10-minute walkthrough:
 
 ### Message-flow diagram
 
-The page shows Service Bus, deterministic ingestion, Blob Storage, the DLQ, and
-the native hosted skill connected by dotted routes. Every browser-submitted record
+The page shows a simplified message flow: Service Bus, deterministic ingestion,
+Blob Storage, the DLQ and the hosted skill connected by dotted routes. The failure
+path summarizes failed processing followed by Service Bus dead-lettering; it is
+not a direct send from the ingestion function. A note clarifies that the DLQ
+belongs to Service Bus and ingestion and repair run in one Function App.
+The resource diagrams above and in the README retain the detailed ownership and
+settlement mechanics. Every browser-submitted record
 has a last-confirmed milestone used to sequence its animation. The owner-authorized
 `GET /api/demo/runs/<run-id>/records/<zero-based-index>` endpoint retains timestamped
 invocation history and output creation time for diagnostics, but the browser does not
@@ -478,8 +493,9 @@ The schema connector returns a binary/base64 `$content` wrapper.
 `src/tools/schema_content.py` provides the native skill with a bounded,
 deterministic decoder that validates the JSON schema. It does not repair records,
 read queues, or send messages. The skill still reads the schema through Blob MCP
-and repairs/requeues through Service Bus MCP. Its unrelated `web_request` tool is
-disabled, so schema identifiers cannot become external fetches.
+and repairs/requeues through Service Bus MCP. The skill instructions prohibit
+web requests and treating schema identifiers as URLs to fetch. The front matter
+does not explicitly disable the runtime's `web_request` tool.
 
 To show that every ingestion invocation was captured, choose the UTC start and
 finish of a completed batch with no other submissions in that interval. Allow
@@ -513,8 +529,9 @@ five-second default read timeout. A delayed SSE acknowledgement can be dropped
 without resolving the MCP call, even after Service Bus accepted the requeue.
 `src/mcp_transport.py` configures these existing clients before native registration:
 30-second connection/write/pool timeouts, 120-second SSE reads and a 150-second
-MCP request deadline. The skill's 240-second deadline is below the unchanged
-five-minute host timeout. This does not replace the native consumer or change
+MCP request deadline. The skill uses the runtime's default deadline rather than
+the previous explicit 240-second limit; the host timeout remains five minutes.
+This does not replace the native consumer or change
 healthy ingestion concurrency. The startup compatibility fix accesses the
 runtime's internal HTTP client field, guarded by its expected type; a layout
 change fails startup and must be revalidated when upgrading the pinned runtime.

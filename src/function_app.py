@@ -29,7 +29,7 @@ def storage() -> BlobServiceClient:
         os.environ["DATA_STORAGE_BLOB_URL"], credential=DefaultAzureCredential(),
     )
 
-
+# Transform and ingest incoming records from the Service Bus queue.
 # The existing function: deterministic code, no model calls.
 @app.service_bus_queue_trigger(
     arg_name="message", queue_name="%INGESTION_QUEUE%", connection="ServiceBusConnection",

@@ -140,12 +140,12 @@ The pinned runtime's authenticated MCP clients need a startup compatibility sett
 30-second connection/write/pool timeouts, a 120-second SSE read timeout and a
 150-second MCP request deadline. Its five-second HTTP default can drop a delayed
 send acknowledgement after the broker already accepted the message. The native
-skill has a 240-second deadline, within the unchanged five-minute host timeout.
+skill uses the runtime's default deadline; the host timeout remains five minutes.
 `src/mcp_transport.py` configures the existing clients, not a replacement consumer.
 It accesses an internal client field and fails startup if that layout changes;
 revalidate it when upgrading the pinned runtime.
-The model defaults to GlobalStandard capacity 500 for the 25-malformed cap, with
-a 2,048-token output limit per model call. Capacity allocates throughput, not
+The model defaults to GlobalStandard capacity 500 for the 25-malformed cap.
+The skill does not override the runtime's model output limit. Capacity allocates throughput, not
 prepaid tokens; actual usage is billed. Lower capacity can throttle concurrent
 repairs, and a batch's malformed count does not guarantee its completion time.
 See the [portal walkthrough](docs/reference.md#show-what-happened-in-the-portal).
@@ -189,10 +189,19 @@ See [local setup and limitations](docs/reference.md#scope).
 
 ```mermaid
 flowchart LR
-    Q[Service Bus: data-ingestion] --> I[Deterministic ingestion function]
+    subgraph SB[Service Bus]
+        Q[data-ingestion queue]
+        D[Dead-letter subqueue]
+    end
+    subgraph AF[One Function App]
+        I[Deterministic ingestion function]
+        S[dlq_repair.agent.md]
+    end
+    Q --> I
     I -->|Valid records| B[Blob Storage: processed-data]
-    I -->|Failed ingestion attempt| D[Service Bus DLQ]
-    D --> S[dlq_repair.agent.md]
+    I -->|Failure: runtime abandons message| Q
+    Q -->|Service Bus: delivery limit reached| D
+    D -->|DLQ trigger| S
     S -->|Model calls| M[Microsoft Foundry]
     S -->|Blob MCP: read schema| C[Blob Storage: schemas]
     S -->|Service Bus MCP: requeue| Q

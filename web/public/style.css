@@ -74,6 +74,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.8 ui-monospac
 .route-malformed { stroke: #d1a266; }
 .route-recovered { stroke: #ab8bda; }
 .flow-route-labels { fill: #79869a; font-size: 13px; }
+.flow-ownership { margin: 0 6px 14px; }
 .node-box { fill: #fff; stroke: #dae4f3; stroke-width: 1.5; }
 .node-icon { fill: #eaf0fe; }
 .node-symbol { fill: #3765be; font: 600 14px ui-monospace, SFMono-Regular, Consolas, monospace; }
